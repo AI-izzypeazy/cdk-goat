@@ -1,0 +1,7 @@
+# Scan outputs (the sample under examples/sample_output IS committed)
+/out/
+/demo_out/
+/scout_output/
+*.egg-info/
+__pycache__/
+*.pyc

@@ -1,0 +1,2 @@
+domain,priority,fit,opportunity,platform,incumbent_vendor,actionable_findings,top_gap
+127.0.0.1:8078,B,95,40,Shopify,None detected,5,Search has no typo tolerance
