@@ -1,0 +1,106 @@
+{
+  "domain": "127.0.0.1:8079",
+  "generated_at": 1782311150.965699,
+  "fit_score": 95.0,
+  "opportunity_score": 39.7,
+  "priority": "B",
+  "pages_crawled": 5,
+  "profile": {
+    "domain": "127.0.0.1:8079",
+    "homepage_url": "http://127.0.0.1:8079",
+    "platform": "shopify",
+    "platform_name": "Shopify",
+    "incumbent_vendor": "none",
+    "incumbent_vendor_name": "None detected",
+    "is_existing_constructor": false,
+    "has_search": true,
+    "search_endpoint": "http://127.0.0.1:8079/search?q={q}",
+    "search_param": "q",
+    "looks_ecommerce": true,
+    "catalog_signals": [
+      "add to cart",
+      "itemprop=\"price\"",
+      "og:type\" content=\"product",
+      "price",
+      "product"
+    ]
+  },
+  "summary": "127.0.0.1:8079 (Shopify) shows 5 addressable product-discovery gap(s), led by search has no typo tolerance. Incumbent discovery: None detected. Strong fit for a tailored Constructor.io walkthrough.",
+  "findings": [
+    {
+      "code": "no_typo_tolerance",
+      "title": "Search has no typo tolerance",
+      "capability": "typo_tolerance",
+      "severity": "high",
+      "detail": "\"jacket\" returns results but the misspelling \"jakcet\" returns nothing. Roughly 1 in 10 search queries contain a typo; today those shoppers hit a dead end.",
+      "recommendation": "Constructor applies typo tolerance, plurals and synonyms automatically so \"jakcet\" resolves to the same products as \"jacket\".",
+      "evidence": [
+        "Query \"jacket\" \u2192 ~3 results",
+        "Query \"jakcet\" \u2192 ~0 results (zero-results page)",
+        "http://127.0.0.1:8079/search?q=jakcet"
+      ],
+      "example": "In testing we observed: Query \"jacket\" \u2192 ~3 results.",
+      "confidence": 0.7
+    },
+    {
+      "code": "weak_or_no_autosuggest",
+      "title": "No autosuggest / typeahead detected",
+      "capability": "autosuggest",
+      "severity": "high",
+      "detail": "We found no autosuggest/typeahead wiring on the search box. Autosuggest is where a large share of search revenue is captured \u2014 shoppers convert on suggested products and terms before submitting.",
+      "recommendation": "Constructor Autosuggest adds product previews, trending and recovery suggestions in the typeahead, typically lifting search-led conversion.",
+      "evidence": [
+        "Homepage: http://127.0.0.1:8079"
+      ],
+      "example": "In testing we observed: Homepage: http://127.0.0.1:8079.",
+      "confidence": 0.5
+    },
+    {
+      "code": "weak_faceting",
+      "title": "Thin or missing faceted navigation",
+      "capability": "facets",
+      "severity": "medium",
+      "detail": "The category/search listing shows little or no faceted filtering (price, color, size, brand). On large catalogs, weak facets force shoppers to scroll endlessly and abandon.",
+      "recommendation": "Constructor Browse auto-enriches product attributes into rich, rankable facets so shoppers can narrow large catalogs instantly.",
+      "evidence": [
+        "Listing page: http://127.0.0.1:8079/collections/jackets",
+        "facet signal score=0"
+      ],
+      "example": "In testing we observed: Listing page: http://127.0.0.1:8079/collections/jackets.",
+      "confidence": 0.45
+    },
+    {
+      "code": "no_recommendations",
+      "title": "No recommendation pods detected",
+      "capability": "recommendations",
+      "severity": "high",
+      "detail": "We found no recommendation modules ('you may also like', 'customers also bought', 'complete the look') on the homepage or product page. Recs are one of the highest-ROI discovery surfaces for AOV.",
+      "recommendation": "Constructor Recommendations adds revenue-optimized pods to PDP, cart and homepage, driving units-per-order and AOV lift.",
+      "evidence": [
+        "Pages checked: homepage, product"
+      ],
+      "example": "In testing we observed: Pages checked: homepage, product.",
+      "confidence": 0.5
+    },
+    {
+      "code": "no_personalization",
+      "title": "No visible personalization",
+      "capability": "personalization",
+      "severity": "low",
+      "detail": "No signs of personalized merchandising ('recommended for you', 'because you viewed'). Discovery is one-size-fits-all, so returning shoppers see the same generic ranking as first-time visitors.",
+      "recommendation": "Constructor Personalization reranks search, browse and recs per shopper in real time off behavioral signals.",
+      "evidence": [
+        "No personalization markers found across crawled pages"
+      ],
+      "example": "In testing we observed: No personalization markers found across crawled pages.",
+      "confidence": 0.35
+    }
+  ],
+  "outreach": {
+    "subject": "Quick observation about search & discovery on 127.0.0.1:8079",
+    "body": "Hi there,\n\nI took a look at 127.0.0.1:8079 from a shopper's perspective and noticed a few product-discovery gaps that tend to cost retailers revenue:\n\n\u2022 Search has no typo tolerance \u2014 Constructor applies typo tolerance, plurals and synonyms automatically so \"jakcet\" resolves to the same products as \"jacket\".\n\u2022 No autosuggest / typeahead detected \u2014 Constructor Autosuggest adds product previews, trending and recovery suggestions in the typeahead, typically lifting search-led conversion.\n\u2022 Thin or missing faceted navigation \u2014 Constructor Browse auto-enriches product attributes into rich, rankable facets so shoppers can narrow large catalogs instantly.\n\nConstructor.io is AI product discovery (search, autosuggest, browse, recommendations, personalization) optimized for revenue. I'd be happy to put together a short, tailored walkthrough using your own site.\n\nWorth a 20-minute look?\n\nBest regards,"
+  },
+  "notes": [
+    "LLM disabled \u2014 using templated copy. Set ANTHROPIC_API_KEY for tailored examples."
+  ]
+}

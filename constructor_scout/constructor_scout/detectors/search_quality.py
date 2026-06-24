@@ -81,6 +81,9 @@ class SearchQualityDetector(Detector):
     def run(self, ctx: ScanContext) -> list[Finding]:
         findings: list[Finding] = []
         prof = ctx.profile
+        # Live query probing is expensive (several requests); skip in shallow mode.
+        if ctx.depth == "shallow":
+            return findings
         if not prof.has_search or not prof.search_endpoint:
             return findings
 

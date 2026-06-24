@@ -18,13 +18,18 @@ def _log(config: Config, msg: str) -> None:
         print(f"  [scout] {msg}", file=sys.stderr)
 
 
-def scan_site(target: str, config: Config, enricher: LLMEnricher | None = None) -> SiteReport:
+def scan_site(
+    target: str,
+    config: Config,
+    enricher: LLMEnricher | None = None,
+    depth: str = "deep",
+) -> SiteReport:
     url = normalize_url(target)
     domain = domain_of(url)
     crawler = Crawler(config)
     enricher = enricher or LLMEnricher(config)
 
-    _log(config, f"crawling {domain}")
+    _log(config, f"crawling {domain} ({depth})")
     home = crawler.fetch(url, role="homepage")
     profile = SiteProfile(domain=domain, homepage_url=url)
 
@@ -44,20 +49,21 @@ def scan_site(target: str, config: Config, enricher: LLMEnricher | None = None) 
         profile.search_endpoint, profile.search_param = form
         _log(config, f"search endpoint: {profile.search_endpoint}")
 
-    # Crawl a few category / product pages
-    for link, role in Crawler.find_category_and_product_links(home, limit=2):
-        if len([p for p in pages if p.ok]) >= config.max_pages:
-            break
-        snap = crawler.fetch(link, role=role)
-        if snap.ok:
-            pages.append(snap)
+    # Crawl a few category / product pages (deep scans only)
+    if depth == "deep":
+        for link, role in Crawler.find_category_and_product_links(home, limit=2):
+            if len([p for p in pages if p.ok]) >= config.max_pages:
+                break
+            snap = crawler.fetch(link, role=role)
+            if snap.ok:
+                pages.append(snap)
 
     # Fingerprint platform + incumbent vendor + ecommerce-ness
     profile = fingerprint(pages, profile)
     _log(config, f"platform={profile.platform_name} incumbent={profile.incumbent_vendor_name}")
 
     # Run detectors
-    ctx = ScanContext(config=config, crawler=crawler, profile=profile, pages=pages)
+    ctx = ScanContext(config=config, crawler=crawler, profile=profile, pages=pages, depth=depth)
     findings = []
     for det in ALL_DETECTORS:
         try:
@@ -80,24 +86,31 @@ def scan_site(target: str, config: Config, enricher: LLMEnricher | None = None) 
         pages_crawled=len([p for p in ctx.pages if p.ok]),
     )
 
-    # LLM enrichment (concrete examples + summary + outreach)
-    _log(config, f"enriching ({'llm' if enricher.active else 'template'})")
-    summary, outreach = enricher.enrich(profile, findings)
+    # LLM enrichment (concrete examples + summary + outreach).
+    # Shallow scans stay cheap/fast with the deterministic template; deep scans
+    # of a selected prospect get full Claude enrichment.
+    if depth == "deep":
+        _log(config, f"enriching ({'llm' if enricher.active else 'template'})")
+        summary, outreach = enricher.enrich(profile, findings)
+        if not enricher.active:
+            report.notes.append(
+                "LLM disabled — using templated copy. Set ANTHROPIC_API_KEY for tailored examples."
+            )
+    else:
+        summary, outreach = enricher.template_brief(profile, findings)
     report.summary = summary
     report.outreach = outreach
-    if not enricher.active:
-        report.notes.append("LLM disabled — using templated copy. Set ANTHROPIC_API_KEY for tailored examples.")
 
     return report
 
 
-def scan_many(targets: list[str], config: Config) -> list[SiteReport]:
+def scan_many(targets: list[str], config: Config, depth: str = "deep") -> list[SiteReport]:
     enricher = LLMEnricher(config)
     reports: list[SiteReport] = []
     for i, t in enumerate(targets, 1):
         _log(config, f"=== [{i}/{len(targets)}] {t} ===")
         try:
-            reports.append(scan_site(t, config, enricher))
+            reports.append(scan_site(t, config, enricher, depth=depth))
         except Exception as exc:
             dom = domain_of(normalize_url(t))
             r = SiteReport(domain=dom, profile=SiteProfile(domain=dom, homepage_url=t))

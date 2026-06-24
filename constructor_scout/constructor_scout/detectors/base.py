@@ -15,6 +15,7 @@ class ScanContext:
     crawler: Crawler
     profile: SiteProfile
     pages: list[PageSnapshot] = field(default_factory=list)
+    depth: str = "deep"   # "shallow" (homepage heuristics) | "deep" (full probing)
 
     def page(self, role: str) -> PageSnapshot | None:
         for p in self.pages:

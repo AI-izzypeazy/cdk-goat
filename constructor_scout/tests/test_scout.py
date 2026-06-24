@@ -156,5 +156,88 @@ class TestPipelineScan(unittest.TestCase):
         self.assertTrue(report.outreach.subject)  # templated fallback
 
 
+class TestDepthModes(unittest.TestCase):
+    def _scan(self, depth):
+        config = Config(delay=0.0, respect_robots=False, use_llm=False)
+        orig = pipeline.Crawler
+        pipeline.Crawler = FakeCrawler
+        try:
+            return pipeline.scan_site("https://x.com", config, depth=depth)
+        finally:
+            pipeline.Crawler = orig
+
+    def test_shallow_skips_live_query_probing(self):
+        shallow = self._scan("shallow")
+        deep = self._scan("deep")
+        shallow_codes = {f.code for f in shallow.findings}
+        deep_codes = {f.code for f in deep.findings}
+        # Typo intolerance requires live probing -> deep only.
+        self.assertNotIn("no_typo_tolerance", shallow_codes)
+        self.assertIn("no_typo_tolerance", deep_codes)
+        # Homepage-level gaps still surface in shallow.
+        self.assertIn("weak_or_no_autosuggest", shallow_codes)
+
+
+class TestRegions(unittest.TestCase):
+    def test_region_queries(self):
+        from constructor_scout.regions import region_queries
+        qs = region_queries("United Kingdom", ["fashion", "beauty"])
+        self.assertTrue(any("United Kingdom" in q for q in qs))
+        self.assertEqual(len([q for q in qs if "fashion" in q]), 1)
+
+
+class TestSelectionParsing(unittest.TestCase):
+    def test_parse(self):
+        from constructor_scout.cli import _parse_selection
+        self.assertEqual(_parse_selection("1,3", 5), [0, 2])
+        self.assertEqual(_parse_selection("1-3", 5), [0, 1, 2])
+        self.assertEqual(_parse_selection("9", 5), [])  # out of range dropped
+
+
+class TestRanking(unittest.TestCase):
+    def test_rank_by_discrepancies(self):
+        from constructor_scout.models import Finding, Severity, SiteProfile, SiteReport
+        from constructor_scout.reporting import rank_by_discrepancies
+
+        def mk(domain, n):
+            f = [Finding(f"c{i}", "t", "search", Severity.HIGH, "d", "r") for i in range(n)]
+            return SiteReport(domain=domain, profile=SiteProfile(domain=domain, homepage_url=""),
+                              findings=f, opportunity_score=n * 10)
+
+        ranked = rank_by_discrepancies([mk("a", 1), mk("b", 3), mk("c", 2)])
+        self.assertEqual([r.domain for r in ranked], ["b", "c", "a"])
+
+
+class TestRegionCommandEndToEnd(unittest.TestCase):
+    def test_region_top_selection_writes_deep_brief(self):
+        import tempfile
+        from constructor_scout import cli
+        from constructor_scout.cli import build_parser
+
+        out = tempfile.mkdtemp()
+        orig_disc = cli.discover_many
+        orig_crawler = pipeline.Crawler
+        cli.discover_many = lambda queries, per, config: ["shopa.com", "shopb.com"]
+        pipeline.Crawler = FakeCrawler
+        try:
+            args = build_parser().parse_args(
+                ["region", "--country", "Testland", "--top", "1",
+                 "--no-llm", "--no-robots", "--delay", "0", "--out", out]
+            )
+            rc = args.func(args)
+        finally:
+            cli.discover_many = orig_disc
+            pipeline.Crawler = orig_crawler
+
+        self.assertEqual(rc, 0)
+        self.assertTrue(os.path.exists(os.path.join(out, "shortlist.md")))
+        deep_briefs = [f for f in os.listdir(out) if f.endswith(".deep.md")]
+        self.assertEqual(len(deep_briefs), 1)
+        with open(os.path.join(out, deep_briefs[0])) as fh:
+            content = fh.read()
+        self.assertIn("Problems & Constructor.io solutions", content)
+        self.assertIn("Solution (Constructor.io)", content)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

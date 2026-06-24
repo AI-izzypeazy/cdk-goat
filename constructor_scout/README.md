@@ -8,6 +8,35 @@ It exists to do one job: point a salesperson at a list of (or a whole vertical
 of) ecommerce sites and get back a ranked pipeline of prospects, each with
 specific, demonstrable reasons to reach out.
 
+## The regional prospecting workflow (primary flow)
+
+```
+You enter a country  ─►  agent discovers retail/ecommerce sites there
+                     ─►  shallow-scans all of them
+                     ─►  ranks a shortlist by # of discovery gaps
+                     ─►  you pick a target prospect
+                     ─►  agent deep-scans it and returns, per gap:
+                            1) the Problem   2) the Constructor.io solution/fix
+```
+
+```bash
+# Interactive: discover UK sites, rank them, prompt you to pick, deep-scan the pick
+python -m constructor_scout region --country "United Kingdom" -v
+
+# Non-interactive: auto deep-scan the top 3 most-gap-ridden prospects
+python -m constructor_scout region --country "Germany" --top 3 --out out
+
+# Pick specific rows from the ranked shortlist
+python -m constructor_scout region --country "Australia" --select 1,4 --out out
+
+# Just the ranked shortlist, no deep scan
+python -m constructor_scout region --country "Canada" --no-deep --out out
+```
+
+Phase 1 writes `shortlist.md` / `shortlist.csv` (ranked, most gaps first). Phase 2
+writes `<domain>.deep.md` — a Problem → Constructor.io-solution brief — plus
+`<domain>.deep.json`. See [`examples/sample_output/demo-storefront.deep.md`](examples/sample_output/demo-storefront.deep.md).
+
 ---
 
 ## What it detects
@@ -58,29 +87,30 @@ falls back to templated copy without it):
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-## Usage
+## Direct scanning (`scan`)
+
+When you already know which sites to audit, `scan` deep-scans them straight away
+and writes a full brief + leaderboard:
 
 ```bash
-# Single site
-python -m constructor_scout --url allbirds.com --out out -v
+# Single site (bare flags also work: `python -m constructor_scout --url ...`)
+python -m constructor_scout scan --url allbirds.com --out out -v
 
 # A list you control (CSV or one-per-line; see examples/targets.example.csv)
-python -m constructor_scout --targets prospects.csv --out out
+python -m constructor_scout scan --targets prospects.csv --out out
 
 # Auto-discover prospects from a vertical, then scan them
-python -m constructor_scout \
+python -m constructor_scout scan \
   --discover "best independent outdoor gear online stores" \
-  --discover "premium coffee subscription shop" \
   --discover-limit 10 --out out
-
-# Combine: a seed list + discovery, no LLM, gentler crawl
-python -m constructor_scout --targets seeds.csv --discover "luxury skincare ecommerce" \
-  --no-llm --delay 2 --max-pages 4 --out out
 ```
 
-Key flags: `--url` (repeatable), `--targets FILE`, `--discover QUERY` (repeatable),
-`--discover-limit N`, `--out DIR`, `--model`, `--no-llm`, `--max-pages`,
-`--delay`, `--timeout`, `--no-robots`, `-v`.
+### Commands & flags
+
+- `region --country "<name>"` — discover → rank → select → deep-scan.
+  `--verticals`, `--per-vertical N`, `--max-sites N`, `--top N`, `--select 1,3`, `--no-deep`.
+- `scan` — `--url` (repeatable), `--targets FILE`, `--discover QUERY` (repeatable), `--discover-limit N`.
+- Shared: `--out DIR`, `--model`, `--no-llm`, `--api-key`, `--max-pages`, `--delay`, `--timeout`, `--no-robots`, `-v`.
 
 ## Try it offline
 
@@ -89,7 +119,7 @@ see a full brief without crawling anything real:
 
 ```bash
 python examples/demo_server.py &        # http://127.0.0.1:8077
-python -m constructor_scout --url http://127.0.0.1:8077 --no-robots --delay 0 --out demo_out -v
+python -m constructor_scout scan --url http://127.0.0.1:8077 --no-robots --delay 0 --out demo_out -v
 ```
 
 ## How it works

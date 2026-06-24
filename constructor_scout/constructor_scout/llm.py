@@ -59,11 +59,11 @@ class LLMEnricher:
     ) -> tuple[str, Outreach]:
         """Return (summary, outreach). Also mutates findings[].example in place."""
         if not self.active or not findings:
-            return self._fallback(profile, findings)
+            return self.template_brief(profile, findings)
         try:
             return self._enrich_llm(profile, findings)
         except Exception:
-            return self._fallback(profile, findings)
+            return self.template_brief(profile, findings)
 
     # -- LLM path -----------------------------------------------------------
     def _enrich_llm(
@@ -110,11 +110,11 @@ class LLMEnricher:
             body=(data.get("outreach_body") or "").strip(),
         )
         if not summary or not outreach.subject:
-            return self._fallback(profile, findings)
+            return self.template_brief(profile, findings)
         return summary, outreach
 
     # -- deterministic fallback --------------------------------------------
-    def _fallback(
+    def template_brief(
         self, profile: SiteProfile, findings: list[Finding]
     ) -> tuple[str, Outreach]:
         actionable = [f for f in findings if f.severity.value != "info"]

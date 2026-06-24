@@ -24,6 +24,26 @@ def _slug(domain: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", domain.lower()).strip("-")
 
 
+def actionable_findings(report: SiteReport) -> list:
+    return [f for f in report.findings if f.severity != Severity.INFO]
+
+
+def rank_by_discrepancies(reports: list[SiteReport]) -> list[SiteReport]:
+    """Rank prospects by number of discrepancies, then opportunity, then fit.
+
+    Existing Constructor customers are pushed to the bottom.
+    """
+    return sorted(
+        reports,
+        key=lambda r: (
+            r.priority == "EXISTING",
+            -len(actionable_findings(r)),
+            -r.opportunity_score,
+            -r.fit_score,
+        ),
+    )
+
+
 def _ts(epoch: float) -> str:
     return _dt.datetime.utcfromtimestamp(epoch).strftime("%Y-%m-%d %H:%M UTC")
 
@@ -119,6 +139,128 @@ def render_brief(report: SiteReport) -> str:
     )
     lines.append("")
     return "\n".join(lines)
+
+
+def render_shortlist(reports: list[SiteReport], region: str = "") -> str:
+    """Phase-1 ranked shortlist (most discrepancies first) for selection."""
+    ranked = rank_by_discrepancies(reports)
+    lines: list[str] = []
+    title = f"Prospect Shortlist — {region}" if region else "Prospect Shortlist"
+    lines.append(f"# Constructor Scout — {title}")
+    lines.append("")
+    gen = _ts(reports[0].generated_at) if reports else ""
+    lines.append(f"_Generated {gen} · {len(reports)} sites shallow-scanned · ranked by # of discovery gaps_")
+    lines.append("")
+    lines.append("| # | Domain | Gaps | Opp | Fit | Platform | Incumbent | Top gap |")
+    lines.append("|---|---|---|---|---|---|---|---|")
+    for i, r in enumerate(ranked, 1):
+        gaps = actionable_findings(r)
+        top = sorted(gaps, key=lambda f: SEV_ORDER[f.severity])
+        tag = " · EXISTING" if r.priority == "EXISTING" else ""
+        lines.append(
+            f"| {i} | {r.domain}{tag} | {len(gaps)} | {r.opportunity_score:.0f} | "
+            f"{r.fit_score:.0f} | {r.profile.platform_name} | "
+            f"{r.profile.incumbent_vendor_name} | {top[0].title if top else '—'} |"
+        )
+    lines.append("")
+    lines.append("_Select a row number to run a deep scan and get a problem → solution brief._")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_shortlist(reports: list[SiteReport], out_dir: str, region: str = "") -> str:
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, "shortlist.md")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(render_shortlist(reports, region))
+    # also a CSV for pipelines
+    csv_path = os.path.join(out_dir, "shortlist.csv")
+    ranked = rank_by_discrepancies(reports)
+    with open(csv_path, "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(["rank", "domain", "gaps", "opportunity", "fit", "platform", "incumbent", "priority"])
+        for i, r in enumerate(ranked, 1):
+            w.writerow([
+                i, r.domain, len(actionable_findings(r)), f"{r.opportunity_score:.0f}",
+                f"{r.fit_score:.0f}", r.profile.platform_name,
+                r.profile.incumbent_vendor_name, r.priority,
+            ])
+    return path
+
+
+def render_problem_solution(report: SiteReport) -> str:
+    """Phase-2 deep-dive brief framed strictly as Problem → Constructor solution."""
+    p = report.profile
+    findings = sorted(
+        [f for f in report.findings if f.severity != Severity.INFO],
+        key=lambda f: (SEV_ORDER[f.severity], -f.confidence),
+    )
+    lines: list[str] = []
+    lines.append(f"# Deep-Dive: {report.domain}")
+    lines.append("")
+    lines.append(f"_Generated {_ts(report.generated_at)} · Constructor Scout deep scan_")
+    lines.append("")
+    lines.append(
+        f"**{p.platform_name}** · incumbent discovery: **{p.incumbent_vendor_name}** · "
+        f"priority **{report.priority}** · opportunity **{report.opportunity_score:.0f}/100**"
+    )
+    lines.append("")
+    if report.summary:
+        lines.append(f"> {report.summary}")
+        lines.append("")
+    if not findings:
+        lines.append("_No actionable discovery gaps found on a deeper scan._")
+        lines.append("")
+        return "\n".join(lines)
+
+    lines.append("## Problems & Constructor.io solutions")
+    lines.append("")
+    for i, f in enumerate(findings, 1):
+        cap = CAPABILITIES.get(f.capability)
+        lines.append(f"### {i}. {SEV_EMOJI[f.severity]} {f.title}")
+        lines.append("")
+        problem = f.example or f.detail
+        lines.append(f"**1) Problem.** {f.detail}")
+        if f.example and f.example != f.detail:
+            lines.append("")
+            lines.append(f"_Concrete example:_ {f.example}")
+        lines.append("")
+        sol = f.recommendation
+        if cap:
+            sol = f"_{cap.name}_ — {f.recommendation} ({cap.docs})"
+        lines.append(f"**2) Solution (Constructor.io).** {sol}")
+        if f.evidence:
+            lines.append("")
+            lines.append(f"_Evidence:_ {'; '.join(f.evidence)}")
+        lines.append("")
+    if report.outreach.subject or report.outreach.body:
+        lines.append("## Suggested outreach")
+        lines.append("")
+        if report.outreach.subject:
+            lines.append(f"**Subject:** {report.outreach.subject}")
+            lines.append("")
+        if report.outreach.body:
+            lines.append("```")
+            lines.append(report.outreach.body)
+            lines.append("```")
+            lines.append("")
+    lines.append("---")
+    lines.append("_Heuristic audit of public pages; verify before outreach._")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_deep_brief(report: SiteReport, out_dir: str) -> dict[str, str]:
+    """Write both the JSON and the problem→solution deep brief."""
+    os.makedirs(out_dir, exist_ok=True)
+    slug = _slug(report.domain)
+    json_path = os.path.join(out_dir, f"{slug}.deep.json")
+    md_path = os.path.join(out_dir, f"{slug}.deep.md")
+    with open(json_path, "w", encoding="utf-8") as fh:
+        json.dump(report.to_dict(), fh, indent=2)
+    with open(md_path, "w", encoding="utf-8") as fh:
+        fh.write(render_problem_solution(report))
+    return {"json": json_path, "brief": md_path}
 
 
 def write_leaderboard(reports: list[SiteReport], out_dir: str) -> dict[str, str]:
