@@ -239,5 +239,48 @@ class TestRegionCommandEndToEnd(unittest.TestCase):
         self.assertIn("Solution (Constructor.io)", content)
 
 
+class TestApi(unittest.TestCase):
+    def setUp(self):
+        try:
+            import fastapi  # noqa: F401
+            from fastapi.testclient import TestClient
+        except Exception:
+            self.skipTest("fastapi not installed")
+        import constructor_scout.api as api
+        self.api = api
+        self._orig_crawler = pipeline.Crawler
+        pipeline.Crawler = FakeCrawler
+        self.client = TestClient(api.app)
+
+    def tearDown(self):
+        pipeline.Crawler = self._orig_crawler
+
+    def _await(self, job_id):
+        import time
+        for _ in range(80):
+            j = self.client.get(f"/api/job/{job_id}").json()
+            if j["status"] in ("done", "error"):
+                return j
+            time.sleep(0.05)
+        self.fail("job did not finish")
+
+    def test_deep_endpoint(self):
+        jid = self.client.post("/api/deep", json={"domain": "https://x.com", "use_llm": False}).json()["job_id"]
+        j = self._await(jid)
+        self.assertEqual(j["status"], "done")
+        r = j["result"]
+        self.assertTrue(r["findings"])
+        self.assertIn("problem", r["findings"][0])
+        self.assertIn("solution", r["findings"][0])
+
+    def test_region_endpoint(self):
+        self.api.discover_many = lambda queries, per, cfg: ["https://a.com", "https://b.com"]
+        jid = self.client.post("/api/region", json={"country": "Testland", "use_llm": False}).json()["job_id"]
+        j = self._await(jid)
+        self.assertEqual(j["status"], "done")
+        self.assertEqual(len(j["result"]["shortlist"]), 2)
+        self.assertEqual(j["result"]["shortlist"][0]["rank"], 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

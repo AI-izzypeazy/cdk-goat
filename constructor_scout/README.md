@@ -87,6 +87,21 @@ falls back to templated copy without it):
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+## Web UI (Lovable)
+
+Prefer a UI over the CLI? Run the agent as an HTTP API and drive it from a
+React frontend built in [Lovable](https://lovable.dev):
+
+```bash
+pip install -e ".[api]"
+uvicorn constructor_scout.api:app --port 8000     # the "brain"
+```
+
+The frontend (region form → ranked shortlist → Problem/Solution brief) and a
+paste-into-Lovable prompt live in [`lovable/`](lovable/) — see
+[`lovable/README.md`](lovable/README.md). The UI calls the API; all crawling and
+Claude enrichment happen server-side.
+
 ## Direct scanning (`scan`)
 
 When you already know which sites to audit, `scan` deep-scans them straight away
