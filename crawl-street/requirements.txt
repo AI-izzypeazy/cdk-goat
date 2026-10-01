@@ -1,0 +1,6 @@
+# Core — the crawler runs on just this plus the Python standard library.
+httpx[http2]>=0.27
+
+# Optional — enables the JS render fallback (render_js / --render).
+# Install with:  pip install playwright && playwright install chromium
+# playwright>=1.44

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crawl Street</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛰️</text></svg>">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">🛰️</span>
+    <div>
+      <h1>Crawl Street</h1>
+      <p class="tag">Mega-efficient catalogue crawler &amp; search tester</p>
+    </div>
+  </div>
+  <div class="phase" id="phasePill"><span class="dot"></span><span id="phaseText">idle</span></div>
+</header>
+
+<main>
+  <!-- ============ CONTROL PANEL ============ -->
+  <section class="panel control">
+    <div class="url-row">
+      <input id="url" type="url" placeholder="https://store.example.com  —  paste a shop URL to crawl"
+             autocomplete="off" spellcheck="false">
+      <button id="startBtn" class="btn primary">Start crawl</button>
+      <button id="stopBtn" class="btn danger" disabled>Stop</button>
+    </div>
+
+    <details class="advanced">
+      <summary>Advanced settings <span class="hint">scope · throughput · anti-block · queries</span></summary>
+      <div class="settings-grid">
+        <div class="group">
+          <h4>Scope</h4>
+          <label>Max pages <input id="max_pages" type="number" value="150" min="1" max="5000"></label>
+          <label>Max depth <input id="max_depth" type="number" value="4" min="0" max="12"></label>
+          <label class="check"><input id="same_host_only" type="checkbox" checked> Stay on target host</label>
+          <label class="check"><input id="include_subdomains" type="checkbox" checked> Include subdomains</label>
+        </div>
+        <div class="group">
+          <h4>Throughput</h4>
+          <label>Concurrency <input id="concurrency" type="number" value="8" min="1" max="64"></label>
+          <label>Per-host <input id="per_host_concurrency" type="number" value="4" min="1" max="32"></label>
+          <label>Min delay (s) <input id="min_delay" type="number" step="0.05" value="0.25"></label>
+          <label>Max delay (s) <input id="max_delay" type="number" step="0.05" value="0.75"></label>
+        </div>
+        <div class="group">
+          <h4>Anti-block hygiene</h4>
+          <label class="check"><input id="rotate_user_agents" type="checkbox" checked> Rotate user-agents</label>
+          <label class="check"><input id="http2" type="checkbox" checked> HTTP/2</label>
+          <label class="check"><input id="respect_robots" type="checkbox" checked> Respect robots.txt</label>
+          <label class="check"><input id="render_js" type="checkbox"> JS render fallback</label>
+          <label>Max retries <input id="max_retries" type="number" value="4" min="0" max="10"></label>
+        </div>
+        <div class="group">
+          <h4>Query testing</h4>
+          <label class="check"><input id="run_queries" type="checkbox" checked> Auto-test site search</label>
+          <label>Max queries <input id="max_queries" type="number" value="25" min="0" max="200"></label>
+          <p class="note">Queries are generated from the crawled catalogue — real brands,
+             categories &amp; product terms, plus typo and nonsense controls.</p>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============ METRIC TILES ============ -->
+  <section class="tiles">
+    <div class="tile"><span class="tval" id="m_pages">0</span><span class="tlabel">Pages fetched</span></div>
+    <div class="tile"><span class="tval" id="m_products">0</span><span class="tlabel">Products</span></div>
+    <div class="tile"><span class="tval" id="m_rate">0</span><span class="tlabel">Pages / sec</span></div>
+    <div class="tile"><span class="tval" id="m_queued">0</span><span class="tlabel">In queue</span></div>
+    <div class="tile warn"><span class="tval" id="m_blocked">0</span><span class="tlabel">Blocked / 429</span></div>
+    <div class="tile"><span class="tval" id="m_rendered">0</span><span class="tlabel">JS-rendered</span></div>
+    <div class="tile health"><span class="tval" id="m_health">—</span><span class="tlabel">Search health</span></div>
+  </section>
+
+  <!-- ============ TABS ============ -->
+  <nav class="tabs">
+    <button class="tab active" data-tab="overview">Overview</button>
+    <button class="tab" data-tab="catalogue">Catalogue <span class="count" id="c_catalogue">0</span></button>
+    <button class="tab" data-tab="queries">Query tests <span class="count" id="c_queries">0</span></button>
+    <button class="tab" data-tab="activity">Activity</button>
+  </nav>
+
+  <section class="panel tabview" id="tab-overview">
+    <div class="overview-grid">
+      <div class="card">
+        <h3>Search endpoint</h3>
+        <div id="searchInfo" class="kv muted">No crawl yet.</div>
+      </div>
+      <div class="card">
+        <h3>Price distribution</h3>
+        <div id="priceInfo" class="kv muted">No products yet.</div>
+      </div>
+      <div class="card span2">
+        <h3>Top brands</h3>
+        <div id="brandChips" class="chips muted">—</div>
+        <h3 style="margin-top:14px">Top categories</h3>
+        <div id="catChips" class="chips muted">—</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel tabview hidden" id="tab-catalogue">
+    <table class="data">
+      <thead><tr><th>Product</th><th>Brand</th><th>Category</th><th>Price</th><th>Source</th></tr></thead>
+      <tbody id="catBody"><tr><td colspan="5" class="muted">No products yet.</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="panel tabview hidden" id="tab-queries">
+    <table class="data">
+      <thead><tr><th>Query</th><th>Intent</th><th>Expect</th><th>Verdict</th><th>Relevance</th><th>Rationale</th></tr></thead>
+      <tbody id="qBody"><tr><td colspan="6" class="muted">No query tests yet.</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="panel tabview hidden" id="tab-activity">
+    <div id="log" class="log muted">Waiting to start…</div>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>
